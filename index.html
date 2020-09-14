@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OT test</title>
+</head>
+
+<body>
+    <textarea name="" id="ta" cols="30" rows="10"></textarea>
+    <button onclick="generateOps()">Generate operations from diff</button>
+</body>
+
+</html>
+
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/diff@latest/dist/diff.min.js"></script>
+
+<script>
+    let content = "";
+    var socket = io();
+
+    socket.on('e_init', (initContent) => {
+        content = initContent;
+        updateTA();
+    });
+
+    socket.on('e_ops', (ops) => {
+        let content = document.querySelector('#ta').value;
+
+        for (const op of ops) {
+            if (op.type === 'ADD') {
+                content = content.slice(0, op.index) + op.value + content.slice(op.index);
+            }
+        }
+
+        console.log('Content after applying ops: ' + content);
+
+        document.querySelector('#ta').value = content;
+    });
+
+    const updateTA = () => {
+        document.querySelector('#ta').value = content;
+    }
+
+    const generateOps = () => {
+        const oldContent = content;
+        const newContent = document.querySelector('#ta').value;
+
+        console.log(oldContent, newContent);
+
+        const diffs = Diff.diffChars(oldContent, newContent);
+
+        const ops = [];
+        let cursorPos = 0;
+        for (const diff of diffs) {
+            if (diff.added) {
+                ops.push({
+                    type: 'ADD',
+                    index: cursorPos,
+                    value: diff.value
+                });
+            } else if (diff.removed) {
+                ops.push({
+                    type: 'DEL',
+                    index: cursorPos,
+                    count: diff.count
+                });
+            }
+
+            cursorPos += diff.count;
+        }
+
+        console.log(diffs, ops);
+        socket.emit('e_ops', ops);
+    }
+</script>
